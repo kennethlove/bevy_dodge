@@ -7,4 +7,6 @@ pub struct MainCamera;
 pub struct Player;
 
 #[derive(Component)]
-pub struct Enemy;
+pub struct Enemy {
+    pub speed: f32,
+}

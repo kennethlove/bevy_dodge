@@ -16,8 +16,8 @@ const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 
-const ENEMY_SPEED: f32 = 100.;
-const MAX_ENEMIES: usize = 10;
+const ENEMY_SPEED: f32 = 200.;
+const MAX_ENEMIES: usize = 50;
 
 const PLAYER_SIZE: Vec3 = Vec3 {
     x: 5.,
@@ -165,6 +165,8 @@ fn spawn_enemy(
         x = x.clamp(-WINDOW_SIZE.x / 2. + WINDOW_PADDING, WINDOW_SIZE.x / 2. - WINDOW_PADDING);
         let y = WINDOW_SIZE.y / 2.;
 
+        let speed = rng.next_u32() as f32 % ENEMY_SPEED;
+
         commands.spawn((
             MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(5.).into()).into(),
@@ -172,7 +174,7 @@ fn spawn_enemy(
                 transform: Transform::from_translation(Vec3::from((x, y, 0.))),
                 ..default()
             },
-            Enemy,
+            Enemy { speed },
         ));
     }
 }
@@ -224,9 +226,9 @@ fn move_player(
     }
 }
 
-fn move_enemy(mut commands: Commands, mut query: Query<(Entity, &mut Transform), With<Enemy>>) {
-    for (entity, mut transform) in query.iter_mut() {
-        transform.translation.y -= ENEMY_SPEED * 0.016;
+fn move_enemy(mut commands: Commands, mut query: Query<(Entity, &mut Transform, &Enemy)>) {
+    for (entity, mut transform, enemy) in query.iter_mut() {
+        transform.translation.y -= enemy.speed * 0.016;
 
         if transform.translation.y < -(WINDOW_SIZE.y / 2.) {
             commands.entity(entity).despawn();
