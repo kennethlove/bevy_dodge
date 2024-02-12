@@ -1,3 +1,5 @@
+mod components;
+
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     input::keyboard::KeyCode,
@@ -8,6 +10,7 @@ use bevy::{
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use rand_core::RngCore;
+use components::{Enemy, MainCamera, Player};
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
@@ -40,15 +43,6 @@ enum GameState {
 struct MenuData {
     button_entity: Entity,
 }
-
-#[derive(Component)]
-struct MainCamera;
-
-#[derive(Component)]
-struct Player;
-
-#[derive(Component)]
-struct Enemy;
 
 fn main() {
     App::new()
