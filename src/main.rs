@@ -16,7 +16,12 @@ const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 
+const ENEMY_COLOR: Color = Color::RED;
+const FAST_ENEMY_COLOR: Color = Color::CRIMSON;
+const SLOW_ENEMY_COLOR: Color = Color::MAROON;
 const ENEMY_SPEED: f32 = 200.;
+const FAST_SPEED: f32 = 150.;
+const SLOW_SPEED: f32 = 50.;
 const MAX_ENEMIES: usize = 50;
 
 const PLAYER_SIZE: Vec3 = Vec3 {
@@ -166,11 +171,20 @@ fn spawn_enemy(
         let y = WINDOW_SIZE.y / 2.;
 
         let speed = rng.next_u32() as f32 % ENEMY_SPEED;
+        let color = {
+            if speed >= FAST_SPEED {
+                FAST_ENEMY_COLOR
+            } else if speed <= SLOW_SPEED {
+                SLOW_ENEMY_COLOR
+            } else {
+                ENEMY_COLOR
+            }
+        };
 
         commands.spawn((
             MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(5.).into()).into(),
-                material: materials.add(ColorMaterial::from(Color::rgb(255., 0., 0.))),
+                material: materials.add(color.into()),
                 transform: Transform::from_translation(Vec3::from((x, y, 0.))),
                 ..default()
             },
