@@ -9,8 +9,13 @@ use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use rand_core::RngCore;
 
+const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
+const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+
 const ENEMY_SPEED: f32 = 100.;
-const MAX_ENEMIES: usize = 100;
+const MAX_ENEMIES: usize = 10;
+
 const PLAYER_SIZE: Vec3 = Vec3 {
     x: 5.,
     y: 5.,
@@ -19,8 +24,22 @@ const PLAYER_SIZE: Vec3 = Vec3 {
 const PLAYER_FOCUS_SPEED: f32 = 50.;
 const PLAYER_SPEED: f32 = 150.;
 const PLAYER_COLOR: Color = Color::rgb(100., 100., 100.);
+
 const WINDOW_PADDING: f32 = 25.;
 const WINDOW_SIZE: Vec2 = Vec2 { x: 300., y: 500. };
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, States)]
+enum GameState {
+    #[default]
+    Menu,
+    Running,
+    GameOver,
+}
+
+#[derive(Resource)]
+struct MenuData {
+    button_entity: Entity,
+}
 
 #[derive(Component)]
 struct MainCamera;
@@ -52,16 +71,91 @@ fn main() {
             FrameTimeDiagnosticsPlugin,
         ))
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::default())
-        .add_systems(Startup, (setup, spawn_player))
+        .add_state::<GameState>()
+        .add_systems(Startup, setup)
+        .add_systems(OnEnter(GameState::Menu), setup_menu)
+        .add_systems(OnExit(GameState::Menu), (cleanup_menu, spawn_player))
         .add_systems(
             FixedUpdate,
-            (move_player, collide_player, move_enemy, spawn_enemy),
+            (move_player, collide_player, move_enemy, spawn_enemy).run_if(
+                in_state(GameState::Running)
+            ),
         )
+        .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
+        .add_systems(Update, bevy::window::close_on_esc)
+        .add_systems(OnExit(GameState::Running), game_over)
         .run();
 }
 
 fn setup(mut commands: Commands) {
     commands.spawn((Camera2dBundle::default(), MainCamera));
+}
+
+fn setup_menu(mut commands: Commands) {
+    let button_entity = commands.spawn(NodeBundle {
+        style: Style {
+            width: Val::Percent(100.),
+            height: Val::Percent(100.),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        ..default()
+    })
+    .with_children(|parent| {
+        parent.spawn(ButtonBundle {
+            style: Style {
+                width: Val::Px(150.),
+                height: Val::Px(65.),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            background_color: NORMAL_BUTTON.into(),
+            ..default()
+        })
+        .with_children(|parent| {
+            parent.spawn(TextBundle::from_section(
+                "Play",
+                TextStyle {
+                    font_size: 40.,
+                    color: Color::rgb(0.9, 0.9, 0.9),
+                    ..default()
+                },
+            ));
+        });
+    })
+    .id();
+    commands.insert_resource(MenuData { button_entity });
+}
+
+fn cleanup_menu(mut commands:Commands, menu_data: Res<MenuData>) {
+    commands.entity(menu_data.button_entity).despawn_recursive();
+}
+
+fn menu(
+    mut next_state: ResMut<NextState<GameState>>,
+    mut interaction_query: Query<(&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<Button>)>
+) {
+    for (interaction, mut color) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                *color = PRESSED_BUTTON.into();
+                next_state.set(GameState::Running);
+            }
+            Interaction::Hovered => {
+                *color = HOVERED_BUTTON.into();
+            }
+            Interaction::None => {
+                *color = NORMAL_BUTTON.into();
+            }
+        }
+    }
+}
+
+fn game_over(mut next_state: ResMut<NextState<GameState>>) {
+    next_state.set(GameState::Menu);
 }
 
 fn spawn_enemy(
@@ -74,13 +168,14 @@ fn spawn_enemy(
     if query.iter().len() < MAX_ENEMIES {
         let mut x = rng.next_u32() as f32 % WINDOW_SIZE.x;
         x = if rng.next_u32() % 2 == 0 { -x } else { x };
+        x = x.clamp(-WINDOW_SIZE.x / 2. + WINDOW_PADDING, WINDOW_SIZE.x / 2. - WINDOW_PADDING);
         let y = WINDOW_SIZE.y / 2.;
 
         commands.spawn((
             MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(5.).into()).into(),
                 material: materials.add(ColorMaterial::from(Color::rgb(255., 0., 0.))),
-                transform: Transform::from_translation(Vec3::from((x, y, 1.))),
+                transform: Transform::from_translation(Vec3::from((x, y, 0.))),
                 ..default()
             },
             Enemy,
@@ -129,6 +224,10 @@ fn move_player(
             transform.translation.x += time.delta_seconds() * speed;
         }
     }
+    for mut transform in query.iter_mut() {
+        transform.translation.x = transform.translation.x.clamp(
+            -WINDOW_SIZE.x/2. + WINDOW_PADDING, WINDOW_SIZE.x/2. - WINDOW_PADDING);
+    }
 }
 
 fn move_enemy(mut commands: Commands, mut query: Query<(Entity, &mut Transform), With<Enemy>>) {
@@ -142,6 +241,7 @@ fn move_enemy(mut commands: Commands, mut query: Query<(Entity, &mut Transform),
 }
 
 fn collide_player(
+    mut next_state: ResMut<NextState<GameState>>,
     mut commands: Commands,
     mut query: Query<(Entity, &Transform), With<Player>>,
     enemy_query: Query<(Entity, &Transform), With<Enemy>>,
@@ -157,6 +257,7 @@ fn collide_player(
             if collision.is_some() {
                 commands.entity(player_entity).despawn();
                 commands.entity(enemy_entity).despawn();
+                next_state.set(GameState::GameOver);
             }
         }
     }
