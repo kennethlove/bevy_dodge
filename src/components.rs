@@ -10,3 +10,6 @@ pub struct Player;
 pub struct Enemy {
     pub speed: f32,
 }
+
+#[derive(Component)]
+pub struct ColorText;

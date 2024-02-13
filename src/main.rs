@@ -9,8 +9,8 @@ use bevy::{
 };
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
+use components::*;
 use rand_core::RngCore;
-use components::{Enemy, MainCamera, Player};
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
@@ -46,6 +46,7 @@ enum GameState {
 
 #[derive(Resource)]
 struct MenuData {
+    text_entity: Entity,
     button_entity: Entity,
 }
 
@@ -73,16 +74,19 @@ fn main() {
         .add_state::<GameState>()
         .add_systems(Startup, setup)
         .add_systems(OnEnter(GameState::Menu), setup_menu)
-        .add_systems(OnExit(GameState::Menu), (cleanup_menu, spawn_player))
+        .add_systems(OnExit(GameState::Menu), cleanup_menu)
+        .add_systems(OnEnter(GameState::Running), spawn_player)
+        .add_systems(OnExit(GameState::Running), cleanup_game)
+        .add_systems(OnEnter(GameState::GameOver), game_over)
+        .add_systems(OnExit(GameState::GameOver), cleanup_game_over)
         .add_systems(
             FixedUpdate,
-            (move_player, collide_player, move_enemy, spawn_enemy).run_if(
-                in_state(GameState::Running)
-            ),
+            (move_player, collide_player, move_enemy, spawn_enemy)
+                .run_if(in_state(GameState::Running)),
         )
         .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
+        .add_systems(Update, menu.run_if(in_state(GameState::GameOver)))
         .add_systems(Update, bevy::window::close_on_esc)
-        .add_systems(OnExit(GameState::Running), game_over)
         .run();
 }
 
@@ -91,51 +95,76 @@ fn setup(mut commands: Commands) {
 }
 
 fn setup_menu(mut commands: Commands) {
-    let button_entity = commands.spawn(NodeBundle {
-        style: Style {
-            width: Val::Percent(100.),
-            height: Val::Percent(100.),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        ..default()
-    })
-    .with_children(|parent| {
-        parent.spawn(ButtonBundle {
+    let button_entity = commands
+        .spawn(NodeBundle {
             style: Style {
-                width: Val::Px(150.),
-                height: Val::Px(65.),
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..default()
             },
-            background_color: NORMAL_BUTTON.into(),
             ..default()
         })
         .with_children(|parent| {
-            parent.spawn(TextBundle::from_section(
-                "Play",
-                TextStyle {
-                    font_size: 40.,
-                    color: Color::rgb(0.9, 0.9, 0.9),
+            parent
+                .spawn(ButtonBundle {
+                    style: Style {
+                        width: Val::Px(150.),
+                        height: Val::Px(65.),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    background_color: NORMAL_BUTTON.into(),
                     ..default()
-                },
-            ));
-        });
-    })
-    .id();
-    commands.insert_resource(MenuData { button_entity });
+                })
+                .with_children(|parent| {
+                    parent.spawn(TextBundle::from_section(
+                        "Play",
+                        TextStyle {
+                            font_size: 40.,
+                            color: Color::rgb(0.9, 0.9, 0.9),
+                            ..default()
+                        },
+                    ));
+                });
+        })
+        .id();
+
+    let text_entity = commands.spawn((
+        TextBundle::from_section(
+            "Dodge",
+            TextStyle {
+                font_size: 100.,
+                color: Color::rgb(0.5, 0.0, 0.0),
+                ..default()
+            },
+        )
+        .with_text_alignment(TextAlignment::Center)
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(WINDOW_PADDING),
+            right: Val::Px(WINDOW_PADDING),
+            ..default()
+        }),
+        ColorText,
+    )).id();
+
+    commands.insert_resource(MenuData { button_entity, text_entity });
 }
 
-fn cleanup_menu(mut commands:Commands, menu_data: Res<MenuData>) {
+fn cleanup_menu(mut commands: Commands, menu_data: Res<MenuData>) {
     commands.entity(menu_data.button_entity).despawn_recursive();
+    commands.entity(menu_data.text_entity).despawn_recursive();
 }
 
 fn menu(
     mut next_state: ResMut<NextState<GameState>>,
-    mut interaction_query: Query<(&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>)>
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<Button>),
+    >,
 ) {
     for (interaction, mut color) in &mut interaction_query {
         match *interaction {
@@ -153,8 +182,74 @@ fn menu(
     }
 }
 
-fn game_over(mut next_state: ResMut<NextState<GameState>>) {
-    next_state.set(GameState::Menu);
+fn game_over(mut commands: Commands) {
+    let button_entity = commands
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            parent
+                .spawn(ButtonBundle {
+                    style: Style {
+                        width: Val::Px(150.),
+                        height: Val::Px(65.),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    background_color: NORMAL_BUTTON.into(),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    parent.spawn(TextBundle::from_section(
+                        "Restart",
+                        TextStyle {
+                            font_size: 40.,
+                            color: Color::rgb(0.9, 0.9, 0.9),
+                            ..default()
+                        },
+                    ));
+                });
+        })
+        .id();
+
+    let text_entity = commands.spawn((
+        TextBundle::from_section(
+            "You Failed",
+            TextStyle {
+                font_size: 90.,
+                color: Color::rgb(0.5, 0.0, 0.0),
+                ..default()
+            },
+        )
+        .with_text_alignment(TextAlignment::Center)
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(WINDOW_PADDING),
+            right: Val::Px(WINDOW_PADDING),
+            ..default()
+        }),
+        ColorText,
+    )).id();
+    commands.insert_resource(MenuData { button_entity, text_entity });
+}
+
+fn cleanup_game_over(mut commands: Commands, menu_data: Res<MenuData>) {
+    commands.entity(menu_data.button_entity).despawn_recursive();
+    commands.entity(menu_data.text_entity).despawn_recursive();
+}
+
+fn cleanup_game(mut commands: Commands, enemy_query: Query<(Entity, &Transform), With<Enemy>>) {
+    for (entity, _) in enemy_query.iter() {
+        commands.entity(entity).despawn();
+    }
 }
 
 fn spawn_enemy(
@@ -167,7 +262,10 @@ fn spawn_enemy(
     if query.iter().len() < MAX_ENEMIES {
         let mut x = rng.next_u32() as f32 % WINDOW_SIZE.x;
         x = if rng.next_u32() % 2 == 0 { -x } else { x };
-        x = x.clamp(-WINDOW_SIZE.x / 2. + WINDOW_PADDING, WINDOW_SIZE.x / 2. - WINDOW_PADDING);
+        x = x.clamp(
+            -WINDOW_SIZE.x / 2. + WINDOW_PADDING,
+            WINDOW_SIZE.x / 2. - WINDOW_PADDING,
+        );
         let y = WINDOW_SIZE.y / 2.;
 
         let speed = rng.next_u32() as f32 % ENEMY_SPEED;
@@ -236,13 +334,19 @@ fn move_player(
     }
     for mut transform in query.iter_mut() {
         transform.translation.x = transform.translation.x.clamp(
-            -WINDOW_SIZE.x/2. + WINDOW_PADDING, WINDOW_SIZE.x/2. - WINDOW_PADDING);
+            -WINDOW_SIZE.x / 2. + WINDOW_PADDING,
+            WINDOW_SIZE.x / 2. - WINDOW_PADDING,
+        );
     }
 }
 
-fn move_enemy(mut commands: Commands, mut query: Query<(Entity, &mut Transform, &Enemy)>) {
+fn move_enemy(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut Transform, &Enemy)>,
+    time: Res<Time>,
+) {
     for (entity, mut transform, enemy) in query.iter_mut() {
-        transform.translation.y -= enemy.speed * 0.016;
+        transform.translation.y -= enemy.speed * time.delta_seconds();
 
         if transform.translation.y < -(WINDOW_SIZE.y / 2.) {
             commands.entity(entity).despawn();
