@@ -1,4 +1,6 @@
+mod camera;
 mod components;
+mod constants;
 
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
@@ -9,32 +11,11 @@ use bevy::{
 };
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
+use bevy_vox::VoxPlugin;
+use camera::{pan_orbit_camera, PanOrbitCamera};
 use components::*;
+use constants::*;
 use rand_core::RngCore;
-
-const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
-const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
-const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
-
-const ENEMY_COLOR: Color = Color::RED;
-const FAST_ENEMY_COLOR: Color = Color::CRIMSON;
-const SLOW_ENEMY_COLOR: Color = Color::MAROON;
-const ENEMY_SPEED: f32 = 200.;
-const FAST_SPEED: f32 = 150.;
-const SLOW_SPEED: f32 = 50.;
-const MAX_ENEMIES: usize = 50;
-
-const PLAYER_SIZE: Vec3 = Vec3 {
-    x: 5.,
-    y: 5.,
-    z: 1.,
-};
-const PLAYER_FOCUS_SPEED: f32 = 50.;
-const PLAYER_SPEED: f32 = 150.;
-const PLAYER_COLOR: Color = Color::rgb(100., 100., 100.);
-
-const WINDOW_PADDING: f32 = 25.;
-const WINDOW_SIZE: Vec2 = Vec2 { x: 300., y: 500. };
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, States)]
 enum GameState {
@@ -53,6 +34,10 @@ struct MenuData {
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
+        .insert_resource(AmbientLight {
+            color: Color::WHITE,
+            brightness: 0.5,
+        })
         .add_plugins((
             DefaultPlugins.set(WindowPlugin {
                 primary_window: Some(Window {
@@ -71,27 +56,57 @@ fn main() {
             FrameTimeDiagnosticsPlugin,
         ))
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::default())
+        .add_plugins(VoxPlugin::default())
         .add_state::<GameState>()
-        .add_systems(Startup, setup)
-        .add_systems(OnEnter(GameState::Menu), setup_menu)
-        .add_systems(OnExit(GameState::Menu), cleanup_menu)
-        .add_systems(OnEnter(GameState::Running), spawn_player)
-        .add_systems(OnExit(GameState::Running), cleanup_game)
-        .add_systems(OnEnter(GameState::GameOver), game_over)
-        .add_systems(OnExit(GameState::GameOver), cleanup_game_over)
-        .add_systems(
-            FixedUpdate,
-            (move_player, collide_player, move_enemy, spawn_enemy)
-                .run_if(in_state(GameState::Running)),
-        )
-        .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
-        .add_systems(Update, menu.run_if(in_state(GameState::GameOver)))
+        .add_systems(Startup, (setup_camera, setup))
+        .add_systems(Update, pan_orbit_camera)
+        // .add_systems(OnEnter(GameState::Menu), setup_menu)
+        // .add_systems(OnExit(GameState::Menu), cleanup_menu)
+        // .add_systems(OnEnter(GameState::Running), spawn_player)
+        // .add_systems(OnExit(GameState::Running), cleanup_game)
+        // .add_systems(OnEnter(GameState::GameOver), game_over)
+        // .add_systems(OnExit(GameState::GameOver), cleanup_game_over)
+        // .add_systems(
+        //     FixedUpdate,
+        //     (move_player, collide_player, move_enemy, spawn_enemy)
+        //         .run_if(in_state(GameState::Running)),
+        // )
+        // .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
+        // .add_systems(Update, menu.run_if(in_state(GameState::GameOver)))
         .add_systems(Update, bevy::window::close_on_esc)
         .run();
 }
 
-fn setup(mut commands: Commands) {
-    commands.spawn((Camera2dBundle::default(), MainCamera));
+fn setup_camera(mut commands: Commands) {
+    let translation = Vec3::new(-2., 2.5, 5.);
+    let radius = translation.length();
+
+    commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
+            ..Default::default()
+        },
+        PanOrbitCamera {
+            radius,
+            ..Default::default()
+        },
+        MainCamera,
+    ));
+}
+
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // light
+    commands.spawn(PointLightBundle {
+        transform: Transform::from_xyz(3., 1.2, 2.5),
+        ..default()
+    });
+
+    // add entities to the world
+    commands.spawn(SceneBundle {
+        scene: asset_server.load("MicroRecon.vox"),
+        transform: Transform::from_xyz(0., 0., 0.),
+        ..default()
+    });
 }
 
 fn setup_menu(mut commands: Commands) {
@@ -132,26 +147,31 @@ fn setup_menu(mut commands: Commands) {
         })
         .id();
 
-    let text_entity = commands.spawn((
-        TextBundle::from_section(
-            "Dodge",
-            TextStyle {
-                font_size: 100.,
-                color: Color::rgb(0.5, 0.0, 0.0),
+    let text_entity = commands
+        .spawn((
+            TextBundle::from_section(
+                "Dodge",
+                TextStyle {
+                    font_size: 100.,
+                    color: Color::rgb(0.5, 0.0, 0.0),
+                    ..default()
+                },
+            )
+            .with_text_alignment(TextAlignment::Center)
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                top: Val::Px(WINDOW_PADDING),
+                right: Val::Px(WINDOW_PADDING),
                 ..default()
-            },
-        )
-        .with_text_alignment(TextAlignment::Center)
-        .with_style(Style {
-            position_type: PositionType::Absolute,
-            top: Val::Px(WINDOW_PADDING),
-            right: Val::Px(WINDOW_PADDING),
-            ..default()
-        }),
-        ColorText,
-    )).id();
+            }),
+            ColorText,
+        ))
+        .id();
 
-    commands.insert_resource(MenuData { button_entity, text_entity });
+    commands.insert_resource(MenuData {
+        button_entity,
+        text_entity,
+    });
 }
 
 fn cleanup_menu(mut commands: Commands, menu_data: Res<MenuData>) {
@@ -220,25 +240,30 @@ fn game_over(mut commands: Commands) {
         })
         .id();
 
-    let text_entity = commands.spawn((
-        TextBundle::from_section(
-            "You Failed",
-            TextStyle {
-                font_size: 90.,
-                color: Color::rgb(0.5, 0.0, 0.0),
+    let text_entity = commands
+        .spawn((
+            TextBundle::from_section(
+                "You Failed",
+                TextStyle {
+                    font_size: 90.,
+                    color: Color::rgb(0.5, 0.0, 0.0),
+                    ..default()
+                },
+            )
+            .with_text_alignment(TextAlignment::Center)
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                top: Val::Px(WINDOW_PADDING),
+                right: Val::Px(WINDOW_PADDING),
                 ..default()
-            },
-        )
-        .with_text_alignment(TextAlignment::Center)
-        .with_style(Style {
-            position_type: PositionType::Absolute,
-            top: Val::Px(WINDOW_PADDING),
-            right: Val::Px(WINDOW_PADDING),
-            ..default()
-        }),
-        ColorText,
-    )).id();
-    commands.insert_resource(MenuData { button_entity, text_entity });
+            }),
+            ColorText,
+        ))
+        .id();
+    commands.insert_resource(MenuData {
+        button_entity,
+        text_entity,
+    });
 }
 
 fn cleanup_game_over(mut commands: Commands, menu_data: Res<MenuData>) {

@@ -9,6 +9,7 @@ version = "0.1.0"
 bevy = { version = "0.12.1", features = ["dynamic_linking"] }
 bevy_prng = { version = "0.2.0", features = ["rand_chacha"] }
 bevy_rand = { version = "0.4.0", features = ["rand_chacha"] }
+bevy_vox = "0.8.1"
 rand_core = "0.6.4"
 
 [profile.dev]
