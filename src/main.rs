@@ -1,14 +1,20 @@
 mod components;
 mod constants;
+mod menu;
 
 use bevy::{
-    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}, ecs::query, input::keyboard::KeyCode, prelude::*, sprite::{collide_aabb::collide, MaterialMesh2dBundle}, window::{PresentMode, WindowTheme}
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    input::keyboard::KeyCode,
+    prelude::*,
+    sprite::{collide_aabb::collide, MaterialMesh2dBundle},
+    window::{PresentMode, WindowTheme}
 };
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use bevy_vox::VoxPlugin;
 use components::*;
 use constants::*;
+use menu::*;
 use rand_core::RngCore;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, States)]
@@ -17,12 +23,6 @@ enum GameState {
     Menu,
     Running,
     GameOver,
-}
-
-#[derive(Resource)]
-struct MenuData {
-    text_entity: Entity,
-    button_entity: Entity,
 }
 
 #[derive(Resource)]
@@ -52,8 +52,8 @@ fn main() {
                 }),
                 ..default()
             }),
-            // LogDiagnosticsPlugin::default(),
-            // FrameTimeDiagnosticsPlugin,
+            LogDiagnosticsPlugin::default(),
+            FrameTimeDiagnosticsPlugin,
         ))
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::default())
         .add_plugins(VoxPlugin::default())
@@ -113,99 +113,6 @@ fn update_score(mut query: Query<&mut Text, With<ScoreText>>, score: Res<Score>)
         text.sections[0].value = format!("Score: {}", score.value);
     }
 
-}
-
-fn setup_menu(mut commands: Commands) {
-    let button_entity = commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            ..default()
-        })
-        .with_children(|parent| {
-            parent
-                .spawn(ButtonBundle {
-                    style: Style {
-                        width: Val::Px(150.),
-                        height: Val::Px(65.),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    background_color: NORMAL_BUTTON.into(),
-                    ..default()
-                })
-                .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "Play",
-                        TextStyle {
-                            font_size: 40.,
-                            color: Color::rgb(0.9, 0.9, 0.9),
-                            ..default()
-                        },
-                    ));
-                });
-        })
-        .id();
-
-    let text_entity = commands
-        .spawn((
-            TextBundle::from_section(
-                "Dodge",
-                TextStyle {
-                    font_size: 100.,
-                    color: Color::rgb(0.5, 0.0, 0.0),
-                    ..default()
-                },
-            )
-            .with_text_alignment(TextAlignment::Center)
-            .with_style(Style {
-                position_type: PositionType::Absolute,
-                top: Val::Px(WINDOW_PADDING),
-                right: Val::Px(WINDOW_PADDING),
-                ..default()
-            }),
-            ColorText,
-        ))
-        .id();
-
-    commands.insert_resource(MenuData {
-        button_entity,
-        text_entity,
-    });
-}
-
-fn cleanup_menu(mut commands: Commands, menu_data: Res<MenuData>) {
-    commands.entity(menu_data.button_entity).despawn_recursive();
-    commands.entity(menu_data.text_entity).despawn_recursive();
-}
-
-fn menu(
-    mut next_state: ResMut<NextState<GameState>>,
-    mut interaction_query: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>),
-    >,
-) {
-    for (interaction, mut color) in &mut interaction_query {
-        match *interaction {
-            Interaction::Pressed => {
-                *color = PRESSED_BUTTON.into();
-                next_state.set(GameState::Running);
-            }
-            Interaction::Hovered => {
-                *color = HOVERED_BUTTON.into();
-            }
-            Interaction::None => {
-                *color = NORMAL_BUTTON.into();
-            }
-        }
-    }
 }
 
 fn game_over(mut commands: Commands) {
@@ -453,13 +360,13 @@ fn move_enemy(
 fn collide_player(
     mut next_state: ResMut<NextState<GameState>>,
     mut commands: Commands,
-    mut query: Query<(Entity, &Transform), With<Player>>,
+    player_query: Query<(Entity, &Transform), With<Player>>,
     enemy_query: Query<(Entity, &Transform), With<Enemy>>,
-    graze_query: Query<(Entity, &Transform), With<Ship>>,
+    graze_query: Query<&Transform, With<Ship>>,
     mut score: ResMut<Score>,
     keyboard_input: Res<Input<KeyCode>>,
 ) {
-    for (player_entity, player_transform) in query.iter_mut() {
+    for (player_entity, player_transform) in player_query.iter() {
         for (enemy_entity, enemy_transform) in enemy_query.iter() {
             let collision = collide(
                 player_transform.translation, // pos a
@@ -474,7 +381,7 @@ fn collide_player(
             }
         }
     }
-    for (_, graze_transform) in graze_query.iter() {
+    for graze_transform in graze_query.iter() {
         for (_, enemy_transform) in enemy_query.iter() {
             let collision = collide(
                 graze_transform.translation, // pos a
@@ -490,7 +397,6 @@ fn collide_player(
                         1
                     }
                 };
-                info!("Score: {}", score.value);
             }
         }
     }
