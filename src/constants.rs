@@ -19,7 +19,9 @@ pub const PLAYER_SIZE: Vec3 = Vec3 {
 };
 pub const PLAYER_FOCUS_SPEED: f32 = 50.;
 pub const PLAYER_SPEED: f32 = 150.;
-pub const PLAYER_COLOR: Color = Color::rgb(100., 100., 100.);
+pub const PLAYER_COLOR: Color = Color::GREEN;
+
+pub const SHIP_SIZE: Vec2 = Vec2 { x: 40., y: 40. };
 
 pub const WINDOW_PADDING: f32 = 25.;
 pub const WINDOW_SIZE: Vec2 = Vec2 { x: 300., y: 500. };

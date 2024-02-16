@@ -1,4 +1,3 @@
-mod camera;
 mod components;
 mod constants;
 
@@ -12,7 +11,6 @@ use bevy::{
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use bevy_vox::VoxPlugin;
-use camera::{pan_orbit_camera, PanOrbitCamera};
 use components::*;
 use constants::*;
 use rand_core::RngCore;
@@ -52,77 +50,44 @@ fn main() {
                 }),
                 ..default()
             }),
-            LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin,
+            // LogDiagnosticsPlugin::default(),
+            // FrameTimeDiagnosticsPlugin,
         ))
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::default())
         .add_plugins(VoxPlugin::default())
         .add_state::<GameState>()
-        .add_systems(Startup, (setup_camera, setup_player))
-        // .add_systems(Update, (pan_orbit_camera, camera_follow))
-        .add_systems(Update, camera_follow)
-        .add_systems(FixedUpdate, move_player)
-        // .add_systems(OnEnter(GameState::Menu), setup_menu)
-        // .add_systems(OnExit(GameState::Menu), cleanup_menu)
-        // .add_systems(OnEnter(GameState::Running), spawn_player)
-        // .add_systems(OnExit(GameState::Running), cleanup_game)
-        // .add_systems(OnEnter(GameState::GameOver), game_over)
-        // .add_systems(OnExit(GameState::GameOver), cleanup_game_over)
-        // .add_systems(
-        //     FixedUpdate,
-        //     (move_player, collide_player, move_enemy, spawn_enemy)
-        //         .run_if(in_state(GameState::Running)),
-        // )
-        // .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
-        // .add_systems(Update, menu.run_if(in_state(GameState::GameOver)))
+        .add_systems(Startup, setup_camera)
+        // .add_systems(Startup, spawn_player)
+        // .add_systems(FixedUpdate, move_player)
+        .add_systems(OnEnter(GameState::Menu), setup_menu)
+        .add_systems(OnExit(GameState::Menu), cleanup_menu)
+        .add_systems(OnEnter(GameState::Running), spawn_player)
+        .add_systems(OnExit(GameState::Running), cleanup_game)
+        .add_systems(OnEnter(GameState::GameOver), game_over)
+        .add_systems(OnExit(GameState::GameOver), cleanup_game_over)
+        .add_systems(
+            FixedUpdate,
+            (move_player, collide_player, move_enemy, spawn_enemy)
+                .run_if(in_state(GameState::Running)),
+        )
+        .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
+        .add_systems(Update, menu.run_if(in_state(GameState::GameOver)))
         .add_systems(Update, bevy::window::close_on_esc)
         .run();
 }
 
 fn setup_camera(mut commands: Commands) {
-    let translation = Vec3::new(-2., 2.5, 5.);
-    let radius = translation.length();
-
+    let translation = Vec3::ZERO;
 
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
+        Camera2dBundle {
+            transform: Transform::from_translation(translation),
             ..Default::default()
         },
-        // PanOrbitCamera {
-        //     radius,
-        //     ..Default::default()
-        // },
         MainCamera,
     ));
 }
 
-fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // add entities to the world
-    let player_transform = Transform::from_translation(Vec3::from((
-        0.,
-        -(WINDOW_SIZE.y / 2.) + WINDOW_PADDING,
-        1.,
-    )));
-    let player_scale = Vec3::splat(0.5);
-    let target = Vec3::ZERO;
-
-    commands.spawn((SceneBundle {
-        scene: asset_server.load("MicroRecon.vox"),
-        transform: player_transform.with_scale(player_scale).looking_at(target, Vec3::Y),
-        ..default()
-    }, Player));
-}
-
-fn camera_follow(
-    mut query: Query<&mut Transform, With<MainCamera>>,
-    player_query: Query<&Transform, (With<Player>, Without<MainCamera>)>,
-) {
-    let player = player_query.single();
-    for mut transform in &mut query {
-        transform.look_at(player.translation, Vec3::Y);
-    }
-}
 
 fn setup_menu(mut commands: Commands) {
     let button_entity = commands
@@ -335,16 +300,27 @@ fn spawn_player(
     mut commands: Commands,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    asset_server: Res<AssetServer>,
 ) {
+    let ship_pos = Vec3::from((0., -(WINDOW_SIZE.y / 2.) + WINDOW_PADDING, 0.));
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(SHIP_SIZE),
+                ..default()
+            },
+            texture: asset_server.load("ship.png"),
+            transform: Transform::from_translation(ship_pos),
+            ..default()
+        },
+        Ship
+    ));
+    let player_pos = ship_pos + Vec3::from((0., -5., 1.));
     commands.spawn((
         MaterialMesh2dBundle {
             mesh: meshes.add(shape::Circle::new(PLAYER_SIZE.x).into()).into(),
             material: materials.add(ColorMaterial::from(PLAYER_COLOR)),
-            transform: Transform::from_translation(Vec3::from((
-                0.,
-                -(WINDOW_SIZE.y / 2.) + WINDOW_PADDING,
-                1.,
-            ))),
+            transform: Transform::from_translation(player_pos),
             ..default()
         },
         Player,
@@ -354,28 +330,72 @@ fn spawn_player(
 fn move_player(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<&mut Transform, With<Player>>,
+    mut query: ParamSet<(
+        Query<&mut Transform, With<Player>>,
+        Query<&mut Transform, With<Ship>>,
+    )>,
 ) {
     let speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
         PLAYER_FOCUS_SPEED
     } else {
         PLAYER_SPEED
     };
+
+
     if keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left) {
-        for mut transform in query.iter_mut() {
+        for mut transform in query.p0().iter_mut() {
+            transform.translation.x -= time.delta_seconds() * speed;
+        }
+        for mut transform in query.p1().iter_mut() {
             transform.translation.x -= time.delta_seconds() * speed;
         }
     }
 
     if keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right) {
-        for mut transform in query.iter_mut() {
+        for mut transform in query.p0().iter_mut() {
+            transform.translation.x += time.delta_seconds() * speed;
+        }
+        for mut transform in query.p1().iter_mut() {
             transform.translation.x += time.delta_seconds() * speed;
         }
     }
-    for mut transform in query.iter_mut() {
+
+    if keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up) {
+        for mut transform in query.p0().iter_mut() {
+            transform.translation.y += time.delta_seconds() * speed;
+        }
+        for mut transform in query.p1().iter_mut() {
+            transform.translation.y += time.delta_seconds() * speed;
+        }
+    }
+
+    if keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down) {
+        for mut transform in query.p0().iter_mut() {
+            transform.translation.y -= time.delta_seconds() * speed;
+        }
+        for mut transform in query.p1().iter_mut() {
+            transform.translation.y -= time.delta_seconds() * speed;
+        }
+    }
+
+    for mut transform in query.p0().iter_mut() {
         transform.translation.x = transform.translation.x.clamp(
             -WINDOW_SIZE.x / 2. + WINDOW_PADDING,
             WINDOW_SIZE.x / 2. - WINDOW_PADDING,
+        );
+        transform.translation.y = transform.translation.y.clamp(
+            -WINDOW_SIZE.y / 2. + WINDOW_PADDING,
+            WINDOW_SIZE.y / 2. - WINDOW_PADDING,
+        );
+    }
+    for mut transform in query.p1().iter_mut() {
+        transform.translation.x = transform.translation.x.clamp(
+            -WINDOW_SIZE.x / 2. + WINDOW_PADDING,
+            WINDOW_SIZE.x / 2. - WINDOW_PADDING,
+        );
+        transform.translation.y = transform.translation.y.clamp(
+            -WINDOW_SIZE.y / 2. + WINDOW_PADDING,
+            WINDOW_SIZE.y / 2. - WINDOW_PADDING,
         );
     }
 }
