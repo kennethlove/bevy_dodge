@@ -58,8 +58,10 @@ fn main() {
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::default())
         .add_plugins(VoxPlugin::default())
         .add_state::<GameState>()
-        .add_systems(Startup, (setup_camera, setup))
-        .add_systems(Update, pan_orbit_camera)
+        .add_systems(Startup, (setup_camera, setup_player))
+        // .add_systems(Update, (pan_orbit_camera, camera_follow))
+        .add_systems(Update, camera_follow)
+        .add_systems(FixedUpdate, move_player)
         // .add_systems(OnEnter(GameState::Menu), setup_menu)
         // .add_systems(OnExit(GameState::Menu), cleanup_menu)
         // .add_systems(OnEnter(GameState::Running), spawn_player)
@@ -81,32 +83,45 @@ fn setup_camera(mut commands: Commands) {
     let translation = Vec3::new(-2., 2.5, 5.);
     let radius = translation.length();
 
+
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
             ..Default::default()
         },
-        PanOrbitCamera {
-            radius,
-            ..Default::default()
-        },
+        // PanOrbitCamera {
+        //     radius,
+        //     ..Default::default()
+        // },
         MainCamera,
     ));
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // light
-    commands.spawn(PointLightBundle {
-        transform: Transform::from_xyz(3., 1.2, 2.5),
-        ..default()
-    });
-
+fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
     // add entities to the world
-    commands.spawn(SceneBundle {
+    let player_transform = Transform::from_translation(Vec3::from((
+        0.,
+        -(WINDOW_SIZE.y / 2.) + WINDOW_PADDING,
+        1.,
+    )));
+    let player_scale = Vec3::splat(0.5);
+    let target = Vec3::ZERO;
+
+    commands.spawn((SceneBundle {
         scene: asset_server.load("MicroRecon.vox"),
-        transform: Transform::from_xyz(0., 0., 0.),
+        transform: player_transform.with_scale(player_scale).looking_at(target, Vec3::Y),
         ..default()
-    });
+    }, Player));
+}
+
+fn camera_follow(
+    mut query: Query<&mut Transform, With<MainCamera>>,
+    player_query: Query<&Transform, (With<Player>, Without<MainCamera>)>,
+) {
+    let player = player_query.single();
+    for mut transform in &mut query {
+        transform.look_at(player.translation, Vec3::Y);
+    }
 }
 
 fn setup_menu(mut commands: Commands) {
