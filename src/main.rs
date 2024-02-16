@@ -2,11 +2,7 @@ mod components;
 mod constants;
 
 use bevy::{
-    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
-    input::keyboard::KeyCode,
-    prelude::*,
-    sprite::{collide_aabb::collide, MaterialMesh2dBundle},
-    window::{PresentMode, WindowTheme},
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}, ecs::query, input::keyboard::KeyCode, prelude::*, sprite::{collide_aabb::collide, MaterialMesh2dBundle}, window::{PresentMode, WindowTheme}
 };
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
@@ -29,6 +25,11 @@ struct MenuData {
     button_entity: Entity,
 }
 
+#[derive(Resource)]
+struct Score {
+    value: i32,
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
@@ -36,6 +37,7 @@ fn main() {
             color: Color::WHITE,
             brightness: 0.5,
         })
+        .insert_resource(Score { value: 0 })
         .add_plugins((
             DefaultPlugins.set(WindowPlugin {
                 primary_window: Some(Window {
@@ -61,7 +63,7 @@ fn main() {
         // .add_systems(FixedUpdate, move_player)
         .add_systems(OnEnter(GameState::Menu), setup_menu)
         .add_systems(OnExit(GameState::Menu), cleanup_menu)
-        .add_systems(OnEnter(GameState::Running), spawn_player)
+        .add_systems(OnEnter(GameState::Running), (spawn_player, show_score))
         .add_systems(OnExit(GameState::Running), cleanup_game)
         .add_systems(OnEnter(GameState::GameOver), game_over)
         .add_systems(OnExit(GameState::GameOver), cleanup_game_over)
@@ -70,6 +72,7 @@ fn main() {
             (move_player, collide_player, move_enemy, spawn_enemy)
                 .run_if(in_state(GameState::Running)),
         )
+        .add_systems(Update, update_score)
         .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
         .add_systems(Update, menu.run_if(in_state(GameState::GameOver)))
         .add_systems(Update, bevy::window::close_on_esc)
@@ -88,6 +91,29 @@ fn setup_camera(mut commands: Commands) {
     ));
 }
 
+fn show_score(mut commands: Commands, score: Res<Score>) {
+    commands.spawn((
+        TextBundle {
+            text: Text::from_section(
+                format!("Score: {}", score.value),
+                TextStyle {
+                    font_size: 15.,
+                    color: Color::rgb(0.9, 0.9, 0.9),
+                    ..default()
+                },
+            ),
+            ..default()
+        },
+        ScoreText,
+    ));
+}
+
+fn update_score(mut query: Query<&mut Text, With<ScoreText>>, score: Res<Score>) {
+    for mut text in query.iter_mut() {
+        text.sections[0].value = format!("Score: {}", score.value);
+    }
+
+}
 
 fn setup_menu(mut commands: Commands) {
     let button_entity = commands
@@ -246,14 +272,24 @@ fn game_over(mut commands: Commands) {
     });
 }
 
-fn cleanup_game_over(mut commands: Commands, menu_data: Res<MenuData>) {
+fn cleanup_game_over(
+    mut commands: Commands,
+    menu_data: Res<MenuData>,
+    mut score: ResMut<Score>,
+) {
     commands.entity(menu_data.button_entity).despawn_recursive();
     commands.entity(menu_data.text_entity).despawn_recursive();
+    score.value = 0;
 }
 
-fn cleanup_game(mut commands: Commands, enemy_query: Query<(Entity, &Transform), With<Enemy>>) {
-    for (entity, _) in enemy_query.iter() {
-        commands.entity(entity).despawn();
+fn cleanup_game(
+    mut commands: Commands,
+    enemy_query: Query<Entity, With<Enemy>>,
+    ship_query: Query<Entity, With<Ship>>
+) {
+    commands.entity(ship_query.single()).despawn();
+    for enemy in enemy_query.iter() {
+        commands.entity(enemy).despawn();
     }
 }
 
@@ -419,6 +455,9 @@ fn collide_player(
     mut commands: Commands,
     mut query: Query<(Entity, &Transform), With<Player>>,
     enemy_query: Query<(Entity, &Transform), With<Enemy>>,
+    graze_query: Query<(Entity, &Transform), With<Ship>>,
+    mut score: ResMut<Score>,
+    keyboard_input: Res<Input<KeyCode>>,
 ) {
     for (player_entity, player_transform) in query.iter_mut() {
         for (enemy_entity, enemy_transform) in enemy_query.iter() {
@@ -432,6 +471,26 @@ fn collide_player(
                 commands.entity(player_entity).despawn();
                 commands.entity(enemy_entity).despawn();
                 next_state.set(GameState::GameOver);
+            }
+        }
+    }
+    for (_, graze_transform) in graze_query.iter() {
+        for (_, enemy_transform) in enemy_query.iter() {
+            let collision = collide(
+                graze_transform.translation, // pos a
+                SHIP_SIZE,                   // radius a
+                enemy_transform.translation, // pos b
+                Vec2::from((7., 7.)),        // radius b
+            );
+            if collision.is_some() {
+                score.value += {
+                    if keyboard_input.pressed(KeyCode::ShiftLeft) {
+                        10
+                    } else {
+                        1
+                    }
+                };
+                info!("Score: {}", score.value);
             }
         }
     }

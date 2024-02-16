@@ -16,3 +16,6 @@ pub struct Enemy {
 
 #[derive(Component)]
 pub struct ColorText;
+
+#[derive(Component)]
+pub struct ScoreText;
