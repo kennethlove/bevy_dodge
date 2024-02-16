@@ -112,7 +112,6 @@ fn update_score(mut query: Query<&mut Text, With<ScoreText>>, score: Res<Score>)
     for mut text in query.iter_mut() {
         text.sections[0].value = format!("Score: {}", score.value);
     }
-
 }
 
 fn game_over(mut commands: Commands) {
@@ -206,6 +205,7 @@ fn spawn_enemy(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     query: Query<&Transform, With<Enemy>>,
+    asset_server: Res<AssetServer>,
 ) {
     if query.iter().len() < MAX_ENEMIES {
         let mut x = rng.next_u32() as f32 % WINDOW_SIZE.x;
@@ -228,12 +228,17 @@ fn spawn_enemy(
         };
 
         commands.spawn((
-            MaterialMesh2dBundle {
-                mesh: meshes.add(shape::Circle::new(5.).into()).into(),
-                material: materials.add(color.into()),
-                transform: Transform::from_translation(Vec3::from((x, y, 0.))),
+            SpriteBundle {
+                sprite: Sprite { custom_size: Some(Vec2::from((20., 20.))), ..default() },
+                texture: asset_server.load("enemy.png"),
+                transform: Transform::from_translation(Vec3::from((x, y, 0.))).with_rotation(Quat::from_rotation_z(std::f32::consts::PI)),
                 ..default()
             },
+            // MaterialMesh2dBundle {
+            //     mesh: meshes.add(shape::Circle::new(5.).into()).into(),
+            //     material: materials.add(color.into()),
+            //     ..default()
+            // },
             Enemy { speed },
         ));
     }
