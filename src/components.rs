@@ -19,3 +19,6 @@ pub struct ColorText;
 
 #[derive(Component)]
 pub struct ScoreText;
+
+#[derive(Component)]
+pub struct Bullet;

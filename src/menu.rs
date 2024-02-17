@@ -25,10 +25,12 @@ pub fn setup_menu(mut commands: Commands) {
             parent
                 .spawn(ButtonBundle {
                     style: Style {
-                        width: Val::Px(150.),
-                        height: Val::Px(65.),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
+                        padding: UiRect {
+                            left: Val::Px(20.),
+                            right: Val::Px(20.),
+                            top: Val::Px(10.),
+                            bottom: Val::Px(10.),
+                        },
                         ..default()
                     },
                     background_color: NORMAL_BUTTON.into(),
@@ -38,7 +40,7 @@ pub fn setup_menu(mut commands: Commands) {
                     parent.spawn(TextBundle::from_section(
                         "Play",
                         TextStyle {
-                            font_size: 40.,
+                            font_size: 20.,
                             color: Color::rgb(0.9, 0.9, 0.9),
                             ..default()
                         },
@@ -48,24 +50,37 @@ pub fn setup_menu(mut commands: Commands) {
         .id();
 
     let text_entity = commands
-        .spawn((
-            TextBundle::from_section(
-                "Dodge",
-                TextStyle {
-                    font_size: 100.,
-                    color: Color::rgb(0.5, 0.0, 0.0),
-                    ..default()
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Stretch,
+                padding: UiRect {
+                    left: Val::Px(WINDOW_PADDING),
+                    right: Val::Px(WINDOW_PADDING),
+                    top: Val::Px(WINDOW_PADDING),
+                    bottom: Val::Px(WINDOW_PADDING),
                 },
-            )
-            .with_text_alignment(TextAlignment::Center)
-            .with_style(Style {
-                position_type: PositionType::Absolute,
-                top: Val::Px(WINDOW_PADDING),
-                right: Val::Px(WINDOW_PADDING),
                 ..default()
-            }),
-            ColorText,
-        ))
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            parent.spawn((
+                TextBundle::from_section(
+                    "Dodge",
+                    TextStyle {
+                        font_size: 80.,
+                        color: Color::rgb(0.5, 0.0, 0.0),
+                        ..default()
+                    },
+                )
+                .with_text_alignment(TextAlignment::Center),
+
+                ColorText,
+            ));
+        })
         .id();
 
     commands.insert_resource(MenuData {
