@@ -1,9 +1,9 @@
+use crate::components::*;
+use crate::constants::*;
 use bevy::prelude::*;
-use rand_core::RngCore;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
-use crate::constants::*;
-use crate::components::*;
+use rand_core::RngCore;
 
 pub fn spawn_enemy(
     mut commands: Commands,
@@ -18,7 +18,7 @@ pub fn spawn_enemy(
             -WINDOW_SIZE.x / 2. + WINDOW_PADDING,
             WINDOW_SIZE.x / 2. - WINDOW_PADDING,
         );
-        let y = WINDOW_SIZE.y / 2.;
+        let y = WINDOW_SIZE.y / 2. - 20.;
 
         let speed = rng.next_u32() as f32 % ENEMY_SPEED;
         let color = {
@@ -34,12 +34,13 @@ pub fn spawn_enemy(
         commands.spawn((
             SpriteBundle {
                 sprite: Sprite {
-                    color: color.into(),
+                    color,
                     custom_size: Some(Vec2::from((20., 20.))),
                     ..default()
                 },
                 texture: asset_server.load("enemy.png"),
-                transform: Transform::from_translation(Vec3::from((x, y, 0.))).with_rotation(Quat::from_rotation_z(std::f32::consts::PI)),
+                transform: Transform::from_translation(Vec3::from((x, y, 0.)))
+                    .with_rotation(Quat::from_rotation_z(std::f32::consts::PI)),
                 ..default()
             },
             Enemy { speed },

@@ -1,10 +1,8 @@
 use crate::components::*;
 use crate::constants::*;
-use crate::{GameState, Score };
+use crate::{GameState, Score};
 use bevy::{
-    input::keyboard::KeyCode,
-    prelude::*,
-    sprite::collide_aabb::collide,
+    input::keyboard::KeyCode, prelude::*, sprite::collide_aabb::collide,
     sprite::MaterialMesh2dBundle,
 };
 
@@ -202,9 +200,9 @@ pub fn collide_bullets(
         for (enemy_entity, enemy_transform) in enemy_query.iter() {
             let collision = collide(
                 bullet_transform.translation, // pos a
-                Vec2::from((2., 2.)),          // radius a
+                Vec2::from((2., 2.)),         // radius a
                 enemy_transform.translation,  // pos b
-                Vec2::from((7., 7.)),          // radius b
+                Vec2::from((20., 20.)),       // radius b
             );
             if collision.is_some() {
                 commands.entity(bullet_entity).despawn();

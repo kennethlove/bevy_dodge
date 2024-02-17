@@ -7,7 +7,7 @@ mod player;
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
-    window::{PresentMode, WindowTheme}
+    window::{PresentMode, WindowTheme},
 };
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
@@ -65,15 +65,17 @@ fn main() {
         .add_systems(OnEnter(GameState::GameOver), game_over)
         .add_systems(OnExit(GameState::GameOver), cleanup_game_over)
         .add_systems(
-            FixedUpdate, (
+            FixedUpdate,
+            (
                 move_player,
                 collide_player,
                 fire_bullet,
                 move_bullets,
                 collide_bullets,
                 move_enemy,
-                spawn_enemy
-            ).run_if(in_state(GameState::Running)),
+                spawn_enemy,
+            )
+                .run_if(in_state(GameState::Running)),
         )
         .add_systems(Update, update_score)
         .add_systems(Update, menu.run_if(in_state(GameState::Menu)))
@@ -95,7 +97,8 @@ fn setup_camera(mut commands: Commands) {
 }
 
 fn show_score(mut commands: Commands, score: Res<Score>) {
-    commands.spawn(NodeBundle {
+    commands
+        .spawn(NodeBundle {
             style: Style {
                 padding: UiRect {
                     left: Val::Px(WINDOW_PADDING),
@@ -118,9 +121,10 @@ fn show_score(mut commands: Commands, score: Res<Score>) {
                         },
                     ),
                     ..default()
-                }, ScoreText));
-            }
-        );
+                },
+                ScoreText,
+            ));
+        });
 }
 
 fn update_score(mut query: Query<&mut Text, With<ScoreText>>, score: Res<Score>) {
@@ -193,11 +197,7 @@ fn game_over(mut commands: Commands) {
     });
 }
 
-fn cleanup_game_over(
-    mut commands: Commands,
-    menu_data: Res<MenuData>,
-    mut score: ResMut<Score>,
-) {
+fn cleanup_game_over(mut commands: Commands, menu_data: Res<MenuData>, mut score: ResMut<Score>) {
     commands.entity(menu_data.button_entity).despawn_recursive();
     commands.entity(menu_data.text_entity).despawn_recursive();
     score.value = 0;
@@ -207,7 +207,7 @@ fn cleanup_game(
     mut commands: Commands,
     bullet_query: Query<Entity, With<Bullet>>,
     enemy_query: Query<Entity, With<Enemy>>,
-    ship_query: Query<Entity, With<Ship>>
+    ship_query: Query<Entity, With<Ship>>,
 ) {
     commands.entity(ship_query.single()).despawn();
     for enemy in enemy_query.iter() {

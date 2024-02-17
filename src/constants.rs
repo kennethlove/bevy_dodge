@@ -4,9 +4,9 @@ pub const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 pub const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 
-pub const ENEMY_COLOR: Color = Color::RED;
-pub const FAST_ENEMY_COLOR: Color = Color::CRIMSON;
-pub const SLOW_ENEMY_COLOR: Color = Color::MAROON;
+pub const ENEMY_COLOR: Color = Color::YELLOW;
+pub const FAST_ENEMY_COLOR: Color = Color::BLUE;
+pub const SLOW_ENEMY_COLOR: Color = Color::RED;
 pub const ENEMY_SPEED: f32 = 200.;
 pub const FAST_SPEED: f32 = 150.;
 pub const SLOW_SPEED: f32 = 50.;
