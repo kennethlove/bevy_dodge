@@ -1,7 +1,7 @@
-use bevy::prelude::*;
 use crate::components::ColorText;
 use crate::constants::*;
 use crate::GameState;
+use bevy::prelude::*;
 
 #[derive(Resource)]
 pub struct MenuData {
@@ -77,7 +77,6 @@ pub fn setup_menu(mut commands: Commands) {
                     },
                 )
                 .with_text_alignment(TextAlignment::Center),
-
                 ColorText,
             ));
         })

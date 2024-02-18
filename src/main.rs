@@ -30,6 +30,14 @@ pub struct Score {
     pub value: i32,
 }
 
+#[derive(Resource)]
+struct AnimationState {
+    min: f32,
+    max: f32,
+    current: f32,
+    speed: f32,
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
@@ -52,12 +60,12 @@ fn main() {
                 }),
                 ..default()
             }),
-            LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin,
+            // LogDiagnosticsPlugin::default(),
+            // FrameTimeDiagnosticsPlugin,
         ))
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::default())
         .add_state::<GameState>()
-        .add_systems(Startup, setup_camera)
+        .add_systems(Startup, (setup_camera, setup_background))
         .add_systems(OnEnter(GameState::Menu), setup_menu)
         .add_systems(OnExit(GameState::Menu), cleanup_menu)
         .add_systems(OnEnter(GameState::Running), (spawn_player, show_score))
@@ -94,6 +102,36 @@ fn setup_camera(mut commands: Commands) {
         },
         MainCamera,
     ));
+}
+
+fn setup_background(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(AnimationState {
+        min: 128.,
+        max: 512.,
+        current: 128.,
+        speed: 50.,
+    });
+    commands.spawn((
+        SpriteBundle {
+            texture: asset_server.load("bg6.png"),
+            ..default()
+        },
+        ImageScaleMode::Tiled {
+            tile_x: true,
+            tile_y: true,
+            stretch_value: 0.5,
+        },
+    ));
+}
+
+fn animate(mut sprites: Query<&mut Sprite>, mut state: ResMut<AnimationState>, time: Res<Time>) {
+    if state.current >= state.max || state.current <= state.min {
+        state.speed = -state.speed;
+    };
+    state.current += state.speed * time.delta_seconds();
+    for mut sprite in &sprites {
+        sprite.custom_size = Some(Vec2::splat(state.current));
+    }
 }
 
 fn show_score(mut commands: Commands, score: Res<Score>) {
